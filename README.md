@@ -22,6 +22,31 @@
 conda env create -f environment.yaml
 conda activate imagebind
 
+```
+
+### If you only want use clip to get image feature or text feature
+
+```bash
+uvicorn api:app --reload
+```
+
+Get text feature
+```bash
+curl --location --request POST '/embtext' \
+--header 'User-Agent: Apifox/1.0.0 (https://apifox.com)' \
+--form 'text="<text>"'
+```
+
+Get image feature
+```bash
+curl --location --request POST '/embimage' \
+--header 'User-Agent: Apifox/1.0.0 (https://apifox.com)' \
+--form 'file=@"<file>"'
+```
+
+### If you want to try webui
+
+```bash
 mkdir data
 
 docker-compose up -d
@@ -36,3 +61,4 @@ python write_md5_path_pair.py # write md5 and path to database
 python process_img.py # process image and write vector to database
 python webui.py # run webui
 ```
+
