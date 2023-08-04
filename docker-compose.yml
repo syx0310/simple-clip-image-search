@@ -1,0 +1,19 @@
+version: '3.3'
+services:
+  pg-dev:
+    image: ankane/pgvector:v0.4.4
+    container_name: pg-dev
+    restart: always
+    ports:
+       - 8100:5432
+    networks:
+      - pgnetwork
+    environment:
+      - POSTGRES_USER=dev
+      - POSTGRES_PASSWORD=dev
+      - POSTGRES_DB=dev
+    volumes:
+      - ./data:/var/lib/postgresql/data
+
+networks:
+  pgnetwork:
