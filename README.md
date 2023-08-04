@@ -4,6 +4,7 @@
 ```
 .
 ├── all_md5.py # 生成所有图片的md5值
+├── api.py # 获取图片/文字特征的简单api
 ├── .assets # 测试用图片文件夹
 ├── clip-test.py # 测试clip模型运行
 ├── config.yml # 配置文件
