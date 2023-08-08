@@ -1,0 +1,19 @@
+db:
+  dburl: postgresql://dev:dev@<dbip>:<dbport>/dev
+devdb:
+  dburl: postgresql://dev:dev@<dbip>:<dbport>/dev
+model:
+  batch_size: 4
+  device: cpu
+  model_name: OFA-Sys/chinese-clip-vit-large-patch14-336px
+mtphotos:
+  access_token: str
+  admin_access_token: str
+  admin_auth_code: str
+  admin_password: admin_password
+  admin_username: admin_username
+  auth_code: str
+  emb_folders: '[{''id'': ''487'', ''path'': ''/photos-1/dev''}]'
+  password: dev
+  username: dev
+  weburl: http://<mtphotosip>:<port>/
