@@ -1,0 +1,36 @@
+version: '3'
+
+services:
+  clip:
+    image: syx0310/mtphotos-clip-search:dev
+    networks:
+      - clip-net
+    ports:
+      - "8000:8000"
+    environment:
+      - DBURL=postgresql://mtphotos:mtphotos@clip-db:5432/mtphotos
+      - CLIP_API_KEY=YOUR_SECRET_API_KEY
+      - MODEL=OFA-Sys/chinese-clip-vit-base-patch16
+      - MODEL_PATH=/data/model
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./data:/data
+
+  clip-db:
+    image: ankane/pgvector:v0.4.4
+    container_name: pg
+    restart: always
+    # Not nessary to expose this port to host
+    ports:
+       - 8100:5432
+    networks:
+      - clip-net
+    environment:
+      - POSTGRES_USER=mtphotos
+      - POSTGRES_PASSWORD=mtphotos
+      - POSTGRES_DB=mtphotos
+    volumes:
+      - ./data/pg:/var/lib/postgresql/data
+
+networks:
+  clip-net:
