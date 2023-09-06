@@ -50,17 +50,6 @@ class embimg(Base):
 		PrimaryKeyConstraint('md5'),
 	)
 
-class embtext(Base):
-    __tablename__ = 'embtext'
-
-    id = Column(Integer, primary_key=True, autoincrement=True) # Auto-incrementing ID
-    contents = Column(String, nullable=False) # Text contents
-    embedding = Column(Vector(768), nullable=True)
-
-    __table_args__ = (
-        PrimaryKeyConstraint('id'),
-    )
-
 class SearchRequest(BaseModel):
     text: str
     start: int
@@ -120,41 +109,16 @@ async def write_imgdb(md5, embedding):
 		session.rollback()
 		raise HTTPException(status_code=500, detail=str(e))
 
-async def write_textdb(contents, embedding):
-	try:
-		existing_record = session.query(embtext).filter_by(contents=contents).first()
-		
-		if existing_record:
-			# If the content exists, update the embedding
-			existing_record.embedding = embedding
-		else:
-			# If the content does not exist, create a new record
-			record = embtext(contents=contents, embedding=embedding)
-			session.add(record)
-		# Commit the transaction
-		session.commit()
-	except Exception as e:
-		logger.error('db error:{}'.format(e))
-		session.rollback()
-		raise HTTPException(status_code=500, detail=str(e))
-
 async def searchDB(session, model, processor, tokenizer, cond):
 	device = model.device
-	if isinstance(cond, str):
-		existing_embedding_query = select(embtext.embedding).filter(embtext.contents == cond)
-		existing_embedding = session.execute(existing_embedding_query).scalar_one_or_none()
-		embeddings = existing_embedding
-	else:
-		existing_embedding = None
 
-	if existing_embedding is None:
-		with torch.no_grad():
-			if isinstance(cond, str):
-				input = tokenizer(cond, return_tensors="pt", padding=True).to(device)
-				embeddings = model.get_text_features(**input)
-			elif isinstance(cond, Image.Image):
-				input = processor(images=cond, return_tensors="pt").to(device)
-				embeddings = model.get_image_features(**input)
+	with torch.no_grad():
+		if isinstance(cond, str):
+			input = tokenizer(cond, return_tensors="pt", padding=True).to(device)
+			embeddings = model.get_text_features(**input)
+		elif isinstance(cond, Image.Image):
+			input = processor(images=cond, return_tensors="pt").to(device)
+			embeddings = model.get_image_features(**input)
 	if embeddings[0].shape[0] != EMB_DIM:
 		logger.error(f"Embedding dimension mismatch, please check your model.")
 		raise HTTPException(status_code=500, detail="Embedding dimension mismatch, please check your model.")
@@ -179,8 +143,7 @@ async def initdb():
 			  'CREATE EXTENSION vector;',
 				'DROP TABLE IF EXISTS embimg;',
 			  f'CREATE TABLE embimg (md5 VARCHAR ,embedding VECTOR({EMB_DIM}), CONSTRAINT pk_embimg PRIMARY KEY (md5));',
-			  'DROP TABLE IF EXISTS embtext;',
-			  f'CREATE TABLE embtext (id SERIAL ,contents VARCHAR,embedding VECTOR({EMB_DIM}), CONSTRAINT pk_embtext PRIMARY KEY (id));']
+				]
 
 	try:
 		for sql in init_sqls:
@@ -225,27 +188,6 @@ async def process_images(md5s: List[str], files: List[UploadFile] = File(...)):
 			return {"status": "Error: GPU memory overflow. Please try with smaller batch size.", 'count': 0 }
 		else:
 			logger.error(f"Error: unexpected error occurred: {str(e)}")
-			return {"status": f"Error: unexpected error occurred: {str(e)}", 'count': 0 }
-
-@api.post("/api/embtext", dependencies=[Depends(get_api_key)])
-async def process_text(text: List[str]):
-	if model is None:
-		# return HTTPException(status_code=500, detail="Text model not loaded")
-		return {"status": f"Error: text model not loaded", 'count': 0 }
-	device = model.device
-	try:
-		inputs = processor(text, padding=True, return_tensors="pt")
-		with torch.no_grad():
-			if device != 'cpu':
-				inputs = inputs.to(device)
-			text_features = model.get_text_features(**inputs)
-		for contents, embedding in zip(text, text_features.tolist()):
-			await write_textdb(contents, embedding)
-		return {'status': 'done', 'count': len(text_features.tolist())}
-	except RuntimeError as e:
-		if "out of memory" in str(e):
-			return {"status": "Error: GPU memory overflow. Please try with shorter texts or fewer texts.", 'count': 0 }
-		else:
 			return {"status": f"Error: unexpected error occurred: {str(e)}", 'count': 0 }
 
 @api.post("/api/search", dependencies=[Depends(get_api_key)])
@@ -316,36 +258,6 @@ async def getAllImageMD5():
 	result = session.execute(query).all()
 	md5 = [i[0] for i in result]
 	return {'md5': md5}
-
-@api.get("/api/getAllTextInfo", dependencies=[Depends(get_api_key)])
-async def getAllTextInfo():
-	query = (
-		select(embtext.id, embtext.contents)
-		.where(embtext.embedding.isnot(None))
-	)
-	id = []
-	contents = []
-	for i in session.execute(query).all():
-		id.append(i[0])
-		contents.append(i[1])
-
-	return {'id': id, 'contents': contents}
-
-@api.delete("/api/deletetext", dependencies=[Depends(get_api_key)])
-async def delete_text(contents: str):
-	try:
-		record = session.query(embtext).filter(embtext.contents == contents).first()
-		if record:
-			session.delete(record)
-			session.commit()
-			logger.info(f"Text {contents} deleted successfully.")
-			return {"message": "Text deleted successfully."}
-		else:
-			raise HTTPException(status_code=404, detail="contents not found in database.")
-	except Exception as e:
-		session.rollback()
-		logger.error('db error:{}'.format(e))
-		raise HTTPException(status_code=500, detail=str(e))
 
 @api.delete("/api/deleteimg", dependencies=[Depends(get_api_key)])
 async def delete_img(request: DeleteImagesRequest = Body(...)):
